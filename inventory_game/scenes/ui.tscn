@@ -1,0 +1,81 @@
+[gd_scene load_steps=11 format=3 uid="uid://bjpj2ada7auj3"]
+
+[ext_resource type="Script" uid="uid://datbrj2mnm3ji" path="res://scripts/SetupUI.cs" id="1_x4jx1"]
+[ext_resource type="Script" uid="uid://ca20vifavqhwc" path="res://scripts/InventoryScript.cs" id="3_cgfq5"]
+[ext_resource type="Script" uid="uid://fwmxjxyw80sp" path="res://scripts/MapScript.cs" id="3_gdt2y"]
+[ext_resource type="Script" uid="uid://dt8n0avjhibxv" path="res://scripts/MenuTabBar.cs" id="3_yev5y"]
+[ext_resource type="Texture2D" uid="uid://1w8c87dimb5r" path="res://textures/slot_1.png" id="4_p7vwb"]
+[ext_resource type="Script" uid="uid://3yggcps8cae3" path="res://scripts/SpellsWindowScript.cs" id="4_wm3ai"]
+[ext_resource type="Texture2D" uid="uid://bleh714e04oo6" path="res://textures/slot_hover.png" id="5_cgfq5"]
+[ext_resource type="Script" uid="uid://p42dg7pnndk5" path="res://customNodes/InvGrid.cs" id="5_ktti3"]
+[ext_resource type="Script" uid="uid://bf8gp64hrbtgr" path="res://scripts/StatScript.cs" id="6_8dubc"]
+
+[sub_resource type="Theme" id="Theme_8dubc"]
+
+[node name="ui" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_x4jx1")
+InventoryNodePath = NodePath("window_inv")
+MapNodePath = NodePath("window_map")
+SpellsNodePath = NodePath("window_spells")
+StatNodePath = NodePath("window_stats")
+MenuNodePath = NodePath("MenuTabBar")
+
+[node name="MenuTabBar" type="TabBar" parent="." node_paths=PackedStringArray("TabBar")]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.03
+anchor_right = 0.97
+anchor_bottom = 0.062
+offset_left = -0.560001
+offset_right = 0.559937
+offset_bottom = -0.176003
+grow_horizontal = 2
+current_tab = 0
+tab_alignment = 1
+tab_count = 4
+tab_0/title = "Inventory"
+tab_0/tooltip = "The inventory tab what are you, stupid?"
+tab_1/title = "Map"
+tab_2/title = "Spells"
+tab_3/title = "Stats"
+script = ExtResource("3_yev5y")
+TabBar = NodePath(".")
+
+[node name="window_inv" type="Window" parent="."]
+title = "Inventory"
+position = Vector2i(134, 90)
+script = ExtResource("3_cgfq5")
+
+[node name="InvGrid" type="TextureRect" parent="window_inv"]
+offset_right = 40.0
+offset_bottom = 40.0
+texture = ExtResource("4_p7vwb")
+script = ExtResource("5_ktti3")
+HoverTxtr = ExtResource("5_cgfq5")
+Txtr = ExtResource("4_p7vwb")
+metadata/_custom_type_script = "uid://p42dg7pnndk5"
+
+[node name="window_map" type="Window" parent="."]
+auto_translate_mode = 1
+title = "Map"
+position = Vector2i(359, 90)
+script = ExtResource("3_gdt2y")
+
+[node name="window_spells" type="Window" parent="."]
+auto_translate_mode = 1
+title = "Spells"
+position = Vector2i(609, 90)
+script = ExtResource("4_wm3ai")
+
+[node name="window_stats" type="Window" parent="."]
+auto_translate_mode = 1
+title = "Stats"
+position = Vector2i(764, 90)
+theme = SubResource("Theme_8dubc")
+script = ExtResource("6_8dubc")
