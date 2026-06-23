@@ -1,23 +1,28 @@
-"""AI OS desktop — Textual TUI."""
+"""Salmon AI OS desktop — tabbed TUI with animated boot."""
 from __future__ import annotations
 import asyncio
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Footer, Input, RichLog, Static
 from textual.reactive import reactive
+from textual.widgets import Footer, Input, RichLog, Static, TabbedContent, TabPane
 from rich.text import Text
 
 from ..core.filesystem import VirtualFS
 from ..ai.assistant import AIAssistant
 from ..apps.shell import Shell
+from ..apps.terminal import TerminalApp
+from ..apps.file_browser import FileBrowser
+from ..apps.editor import EditorApp
+from ..apps.aria_chat import ARIAChatApp
 
-# ── constants ─────────────────────────────────────────────────────────────────
+# ── boot animation data ────────────────────────────────────────────────────────
 
 FISH_R = "><(((°>"
 FISH_L = "<°)))><"
 SWIM_WIDTH = 60
+SWIM_CONFIGS = [(3, 0, 1), (2, 18, -1), (4, 10, 1), (2, 35, -1), (3, 25, 1)]
 
 BANNER_LINES = [
     r"                  ___                              ",
@@ -41,23 +46,11 @@ BOOT_MESSAGES = [
     "",
 ]
 
-# Fish swim configs: (speed, start_offset, direction)
-# direction: +1 = left→right, -1 = right→left
-SWIM_CONFIGS = [
-    (3,  0,  1),
-    (2, 18, -1),
-    (4, 10,  1),
-    (2, 35, -1),
-    (3, 25,  1),
-]
-
-# ── helpers ───────────────────────────────────────────────────────────────────
 
 def _swim_frame(tick: int) -> Text:
-    """Build one frame of the swimming fish animation."""
     t = Text()
-    t.append("\n" * 2)  # top padding
-    fish_colors = ["salmon1", "orange_red1", "dark_orange", "orange1", "salmon1"]
+    t.append("\n" * 2)
+    colors = ["salmon1", "orange_red1", "dark_orange", "orange1", "salmon1"]
     for i, (speed, offset, direction) in enumerate(SWIM_CONFIGS):
         fish = FISH_R if direction == 1 else FISH_L
         flen = len(fish)
@@ -66,27 +59,23 @@ def _swim_frame(tick: int) -> Text:
         if direction == -1:
             pos = period - pos - flen
         line = " " * max(0, pos) + fish
-        t.append(line[:SWIM_WIDTH] + "\n", style=f"bold {fish_colors[i]}")
+        t.append(line[:SWIM_WIDTH] + "\n", style=f"bold {colors[i]}")
     t.append("\n")
     return t
 
 
 def _banner_frame(lines_shown: int, msgs_shown: int) -> Text:
-    """Build frame with N banner lines + M boot messages revealed."""
     t = Text()
     t.append("\n")
     for i, line in enumerate(BANNER_LINES):
-        if i < lines_shown:
-            t.append(line + "\n", style="bold salmon1")
-        else:
-            t.append("\n")
+        t.append((line + "\n") if i < lines_shown else "\n", style="bold salmon1")
     t.append("\n")
     for msg in BOOT_MESSAGES[:msgs_shown]:
         t.append_text(Text.from_markup(msg + "\n"))
     return t
 
 
-# ── widgets ───────────────────────────────────────────────────────────────────
+# ── widgets ────────────────────────────────────────────────────────────────────
 
 class StatusBar(Static):
     cwd = reactive("/")
@@ -100,68 +89,47 @@ class StatusBar(Static):
 
 
 class BootDisplay(Static):
-    """Full-screen animated boot canvas."""
     pass
 
 
-# ── main app ──────────────────────────────────────────────────────────────────
+# ── main app ───────────────────────────────────────────────────────────────────
 
 class Desktop(App):
     CSS = """
-    Screen {
-        background: #0d0d1a;
-    }
-    StatusBar {
-        dock: top;
-        height: 1;
-    }
+    Screen { background: #0d0d1a; }
+
+    StatusBar { dock: top; height: 1; }
+
     BootDisplay {
         height: 1fr;
         content-align: center middle;
         background: #050510;
-        color: salmon;
         padding: 2 4;
     }
-    #main-panel {
-        height: 1fr;
-        display: none;
-    }
-    #main-panel.ready {
-        display: block;
-    }
-    #output-log {
-        border: round #1e3a5f;
-        background: #050510;
-        height: 1fr;
-        scrollbar-color: #1e3a5f;
-    }
-    #input-row {
-        height: 3;
-        align: left middle;
-    }
-    #prompt-label {
-        width: auto;
-        color: #00bfff;
-        padding: 0 1;
-    }
+
+    TabbedContent { height: 1fr; display: none; }
+    TabbedContent.ready { display: block; }
+
+    TabPane { height: 1fr; padding: 0; }
+
     Input {
         background: #0a0a20;
         border: round #1e3a5f;
         color: #e0e0ff;
-        width: 1fr;
     }
-    Input:focus {
-        border: round #00bfff;
-    }
-    Footer {
-        background: #0a0a20;
-    }
+    Input:focus { border: round #00bfff; }
+
+    Footer { background: #0a0a20; }
     """
 
     BINDINGS = [
-        Binding("ctrl+c", "quit", "Quit"),
-        Binding("ctrl+l", "clear_log", "Clear"),
-        Binding("ctrl+r", "reset_ai", "Reset AI"),
+        Binding("ctrl+c",     "quit",           "Quit"),
+        Binding("ctrl+1",     "switch_tab('tab-terminal')", "Terminal",  show=False),
+        Binding("ctrl+2",     "switch_tab('tab-files')",    "Files",     show=False),
+        Binding("ctrl+3",     "switch_tab('tab-editor')",   "Editor",    show=False),
+        Binding("ctrl+4",     "switch_tab('tab-aria')",     "ARIA Chat", show=False),
+        Binding("ctrl+r",     "reset_aria",     "Reset ARIA"),
+        Binding("ctrl+l",     "clear_terminal", "Clear"),
     ]
 
     def __init__(self):
@@ -169,108 +137,85 @@ class Desktop(App):
         self.fs = VirtualFS()
         self.ai = AIAssistant()
         self.shell = Shell(self.fs, self.ai)
-        self._pending_write: str | None = None
 
     def compose(self) -> ComposeResult:
         yield StatusBar()
         yield BootDisplay()
-        with Vertical(id="main-panel"):
-            yield RichLog(id="output-log", markup=True, highlight=True, wrap=True)
-            with Horizontal(id="input-row"):
-                yield Static(">_", id="prompt-label")
-                yield Input(placeholder="enter command…", id="cmd-input")
+        with TabbedContent(id="tabs"):
+            with TabPane("  Terminal ", id="tab-terminal"):
+                yield TerminalApp()
+            with TabPane("  Files ", id="tab-files"):
+                yield FileBrowser()
+            with TabPane("  Editor ", id="tab-editor"):
+                yield EditorApp()
+            with TabPane("  ARIA Chat ", id="tab-aria"):
+                yield ARIAChatApp()
         yield Footer()
 
     def on_mount(self) -> None:
         asyncio.create_task(self._boot_animation())
 
-    # ── animation ─────────────────────────────────────────────────────────────
+    # ── boot animation ─────────────────────────────────────────────────────
 
     async def _boot_animation(self) -> None:
         display = self.query_one(BootDisplay)
 
-        # Phase 1: fish swim across the screen
         for tick in range(36):
             display.update(_swim_frame(tick))
             await asyncio.sleep(0.06)
 
-        # Phase 2: banner assembles line by line
         for n in range(1, len(BANNER_LINES) + 1):
             display.update(_banner_frame(n, 0))
             await asyncio.sleep(0.10)
 
-        # Phase 3: boot messages appear one by one
         for m in range(1, len(BOOT_MESSAGES) + 1):
             display.update(_banner_frame(len(BANNER_LINES), m))
             await asyncio.sleep(0.12)
 
-        # Phase 4: flash the banner three times then hand off
         for _ in range(3):
             display.update(_banner_frame(len(BANNER_LINES), len(BOOT_MESSAGES)))
             await asyncio.sleep(0.12)
             display.update(Text(""))
             await asyncio.sleep(0.08)
 
-        # Transition to shell
         display.remove()
-        log = self.query_one(RichLog)
-        self.query_one("#main-panel").add_class("ready")
-        log.write(_banner_frame(len(BANNER_LINES), len(BOOT_MESSAGES)))
-        self.query_one(Input).focus()
-        self._sync_status()
-
-    # ── shell ─────────────────────────────────────────────────────────────────
-
-    def _sync_status(self) -> None:
+        self.query_one(TabbedContent).add_class("ready")
         self.query_one(StatusBar).cwd = self.fs.cwd
+        self.query_one("#tab-terminal TerminalApp Input").focus()
 
-    async def on_input_submitted(self, event: Input.Submitted) -> None:
-        raw = event.value.strip()
-        self.query_one(Input).clear()
-        if not raw:
-            return
+    # ── tab actions ────────────────────────────────────────────────────────
 
-        log = self.query_one(RichLog)
+    def action_switch_tab(self, tab_id: str) -> None:
+        self.query_one(TabbedContent).active = tab_id
 
-        if self._pending_write is not None:
-            path = self._pending_write
-            self._pending_write = None
-            ok = self.fs.write(path, raw)
-            log.write(Text.from_markup(
-                f"  [green]✓ written:[/] {path}" if ok else f"  [red]✗ write failed:[/] {path}"
-            ))
-            return
+    def on_tabbed_content_tab_activated(self, event: TabbedContent.TabActivated) -> None:
+        pane_id = event.pane.id if event.pane else None
+        focus_map = {
+            "tab-terminal": "#tab-terminal #terminal-input",
+            "tab-files":    "#tab-files #fs-tree",
+            "tab-editor":   "#tab-editor TextArea",
+            "tab-aria":     "#tab-aria #chat-input",
+        }
+        selector = focus_map.get(pane_id or "")
+        if selector:
+            try:
+                self.query_one(selector).focus()
+            except Exception:
+                pass
 
-        log.write(Text.from_markup(f"[bold cyan]>[/] [white]{raw}[/]"))
-        await self._dispatch(raw, log)
-        self._sync_status()
+    # ── global actions ─────────────────────────────────────────────────────
 
-    async def _dispatch(self, raw: str, log: RichLog) -> None:
-        loop = asyncio.get_event_loop()
-        output, clear = await loop.run_in_executor(None, self.shell.run, raw)
-
-        if clear:
-            log.clear()
-            return
-        if output == "__EXIT__":
-            self.exit()
-            return
-        if isinstance(output, str) and output.startswith("__WRITE__:"):
-            path = output[len("__WRITE__:"):]
-            if not path:
-                log.write(Text.from_markup("[red]write: missing filename[/]"))
-                return
-            self._pending_write = path
-            log.write(Text.from_markup(
-                f"[yellow]Enter content for[/] [bold]{path}[/] [yellow]then press Enter:[/]"
-            ))
-            return
-        if output:
-            log.write(Text.from_markup(output))
-
-    def action_clear_log(self) -> None:
-        self.query_one(RichLog).clear()
-
-    def action_reset_ai(self) -> None:
+    def action_reset_aria(self) -> None:
         self.ai.reset()
-        self.query_one(RichLog).write(Text.from_markup("[yellow]ARIA memory cleared.[/]"))
+        try:
+            self.query_one("#chat-log", RichLog).write(
+                Text.from_markup("[yellow]ARIA memory cleared.[/]")
+            )
+        except Exception:
+            pass
+
+    def action_clear_terminal(self) -> None:
+        try:
+            self.query_one("#terminal-log", RichLog).clear()
+        except Exception:
+            pass
