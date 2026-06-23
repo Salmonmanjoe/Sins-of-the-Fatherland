@@ -1,0 +1,4 @@
+anthropic>=0.30.0
+textual>=0.70.0
+rich>=13.7.0
+prompt_toolkit>=3.0.43
