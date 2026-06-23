@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from ..core.filesystem import VirtualFS
     from ..ai.assistant import AIAssistant
+    from ..core.process_registry import ProcessRegistry
 
 
 HELP_TEXT = """
@@ -21,6 +22,10 @@ AI OS Shell — built-in commands
   mkdir <dir>       Create a directory
   echo <text>       Print text
   clear             Clear the screen
+  ps                List running processes
+  run <job>         Spawn a background job
+  kill <pid>        Terminate a user process
+  jobs              Show available background jobs
   ai <prompt>       Talk to ARIA (AI assistant)
   ai reset          Reset ARIA conversation history
   sysinfo           Show OS info
@@ -31,9 +36,11 @@ Any unrecognised command is forwarded to ARIA.
 
 
 class Shell:
-    def __init__(self, fs: "VirtualFS", ai: "AIAssistant"):
+    def __init__(self, fs: "VirtualFS", ai: "AIAssistant",
+                 procs: "ProcessRegistry | None" = None):
         self.fs = fs
         self.ai = ai
+        self.procs = procs
 
     def run(self, raw: str) -> tuple[str, bool]:
         """Process a command. Returns (output, should_clear)."""
@@ -74,6 +81,14 @@ class Shell:
             return "__WRITE__:" + (args[0] if args else ""), False
         if cmd == "ai":
             return self._ai(args), False
+        if cmd == "ps":
+            return self._ps(), False
+        if cmd == "run":
+            return self._run(args[0] if args else ""), False
+        if cmd == "kill":
+            return self._kill(args[0] if args else ""), False
+        if cmd == "jobs":
+            return self._jobs(), False
 
         # Unknown command → forward to ARIA
         return self._ai([raw]), False
@@ -125,6 +140,45 @@ class Shell:
             return self.ai.chat(prompt)
         except Exception as e:
             return f"ARIA error: {e}"
+
+    def _ps(self) -> str:
+        if not self.procs:
+            return "ps: process registry unavailable"
+        lines = [f"{'PID':>5}  {'NAME':<16}  {'STATUS':<10}  {'CPU%':>5}  {'MEM':>8}  OWNER"]
+        lines.append("─" * 62)
+        for p in self.procs.list_all():
+            lines.append(
+                f"{p.pid:>5}  {p.name:<16}  {p.status:<10}  "
+                f"{p.sample_cpu():>4.1f}%  {p.sample_mem():>5.1f} MB  {p.owner}"
+            )
+        return "\n".join(lines)
+
+    def _run(self, name: str) -> str:
+        if not name:
+            return "run: missing job name. Try: run log-writer"
+        if not self.procs:
+            return "run: process registry unavailable"
+        _, msg = self.procs.spawn(name, self.fs)
+        return msg
+
+    def _kill(self, arg: str) -> str:
+        if not arg:
+            return "kill: missing PID"
+        if not self.procs:
+            return "kill: process registry unavailable"
+        try:
+            pid = int(arg)
+        except ValueError:
+            return f"kill: '{arg}' is not a PID"
+        _, msg = self.procs.kill(pid)
+        return msg
+
+    def _jobs(self) -> str:
+        from ..core.process_registry import AVAILABLE_JOBS
+        lines = ["Available background jobs:", "─" * 46]
+        for name, (desc, cpu, mem) in AVAILABLE_JOBS.items():
+            lines.append(f"  {name:<16}  {desc}")
+        return "\n".join(lines)
 
     def _sysinfo(self) -> str:
         content = self.fs.read("etc/os-release") or ""

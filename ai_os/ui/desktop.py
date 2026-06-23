@@ -10,12 +10,14 @@ from textual.widgets import Footer, Input, RichLog, Static, TabbedContent, TabPa
 from rich.text import Text
 
 from ..core.filesystem import VirtualFS
+from ..core.process_registry import ProcessRegistry
 from ..ai.assistant import AIAssistant
 from ..apps.shell import Shell
 from ..apps.terminal import TerminalApp
 from ..apps.file_browser import FileBrowser
 from ..apps.editor import EditorApp
 from ..apps.aria_chat import ARIAChatApp
+from ..apps.process_manager import ProcessManager
 
 # ── boot animation data ────────────────────────────────────────────────────────
 
@@ -128,15 +130,17 @@ class Desktop(App):
         Binding("ctrl+2",     "switch_tab('tab-files')",    "Files",     show=False),
         Binding("ctrl+3",     "switch_tab('tab-editor')",   "Editor",    show=False),
         Binding("ctrl+4",     "switch_tab('tab-aria')",     "ARIA Chat", show=False),
+        Binding("ctrl+5",     "switch_tab('tab-procs')",   "Processes", show=False),
         Binding("ctrl+r",     "reset_aria",     "Reset ARIA"),
         Binding("ctrl+l",     "clear_terminal", "Clear"),
     ]
 
     def __init__(self):
         super().__init__()
-        self.fs = VirtualFS()
-        self.ai = AIAssistant()
-        self.shell = Shell(self.fs, self.ai)
+        self.fs    = VirtualFS()
+        self.ai    = AIAssistant()
+        self.procs = ProcessRegistry()
+        self.shell = Shell(self.fs, self.ai, self.procs)
 
     def compose(self) -> ComposeResult:
         yield StatusBar()
@@ -150,6 +154,8 @@ class Desktop(App):
                 yield EditorApp()
             with TabPane("  ARIA Chat ", id="tab-aria"):
                 yield ARIAChatApp()
+            with TabPane("  Processes ", id="tab-procs"):
+                yield ProcessManager()
         yield Footer()
 
     def on_mount(self) -> None:
@@ -195,6 +201,7 @@ class Desktop(App):
             "tab-files":    "#tab-files #fs-tree",
             "tab-editor":   "#tab-editor TextArea",
             "tab-aria":     "#tab-aria #chat-input",
+            "tab-procs":    "#tab-procs #proc-table",
         }
         selector = focus_map.get(pane_id or "")
         if selector:
