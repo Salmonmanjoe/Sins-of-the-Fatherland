@@ -11,7 +11,7 @@ def check_env():
 
 def main():
     check_env()
-    from ui.desktop import Desktop
+    from ai_os.ui.desktop import Desktop
     app = Desktop()
     app.run()
 
