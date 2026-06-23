@@ -17,22 +17,25 @@ from ..ai.assistant import AIAssistant
 from ..apps.shell import Shell
 
 BOOT_LINES = [
-    "[bold cyan]AI OS[/] v0.1.0 — booting...",
+    "[bold cyan]Salmon AI OS[/] v0.1.0 — booting...",
     "  [green]✓[/] Kernel loaded",
     "  [green]✓[/] Virtual filesystem mounted",
     "  [green]✓[/] ARIA AI module initialised",
     "  [green]✓[/] Shell ready",
     "",
-    "[bold white]Welcome to AI OS.[/] Type [bold cyan]help[/] to get started.",
+    "[bold white]Welcome to Salmon AI OS.[/] Type [bold cyan]help[/] to get started.",
     "",
 ]
 
 BANNER = r"""
-   _   _    ___    ___    ____
-  /_\ | |  / _ \  / _ \  / ___|
- //_\\| | | | | || | | | \___ \
-/  _  \ |_| |_| || |_| |  ___) |
-\_/ \_/____\___/  \___/  |____/
+                  ___
+    ______       /o o \         ><(((°>
+   /      \`~~~/       \    ><(((°>
+  /  ~  ~  `--'  ~  ~  \      ><(((°>
+ / ~ SALMON ~ AI ~ OS ~  \
+<____~~~~~~~~~~~~~~~~~~~~>
+      \    ><(((°>    /
+       `~~~~~~~~~~~~~~'
 """
 
 
@@ -41,7 +44,7 @@ class StatusBar(Static):
 
     def render(self) -> Text:
         t = Text()
-        t.append(" AI OS ", style="bold white on dark_blue")
+        t.append(" 🐟 SALMON AI OS ", style="bold white on dark_red")
         t.append(f" {self.cwd} ", style="white on grey23")
         t.append(" ARIA online ", style="bold green on grey15")
         return t
@@ -117,7 +120,7 @@ class Desktop(App):
 
     def _boot(self) -> None:
         log = self.query_one(RichLog)
-        log.write(Text.from_markup(BANNER.strip(), style="bold dark_blue"))
+        log.write(Text.from_markup(BANNER.strip(), style="bold salmon1"))
         for line in BOOT_LINES:
             log.write(Text.from_markup(line))
         self._sync_status()

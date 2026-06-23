@@ -28,9 +28,9 @@ class VirtualFS:
             self.mkdir(path)
 
         self.write("etc/os-release",
-                   "NAME=AI-OS\nVERSION=0.1.0\nID=ai-os\nPRETTY_NAME=\"AI OS 0.1.0\"\n")
+                   "NAME=Salmon-AI-OS\nVERSION=0.1.0\nID=salmon-ai-os\nPRETTY_NAME=\"Salmon AI OS 0.1.0\"\n")
         self.write("etc/motd",
-                   "Welcome to AI OS — powered by Claude.\nType 'help' to begin.\n")
+                   "Welcome to Salmon AI OS — powered by Claude.\nType 'help' to begin.\n")
         self.write("home/user/readme.txt",
                    "This is your home directory.\nFiles you create here persist during your session.\n")
         self.write("sys/ai/model.cfg",

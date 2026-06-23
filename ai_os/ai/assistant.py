@@ -11,7 +11,7 @@ class AIAssistant:
         self.history: list[dict] = []
         self.system_prompt = (
             "You are ARIA (Artificial Reasoning & Intelligence Assistant), "
-            "the built-in AI of AI OS — a futuristic operating system. "
+            "the built-in AI of Salmon AI OS — a futuristic operating system. "
             "You help users with tasks, answer questions, write code, manage files, "
             "and generally act as a knowledgeable OS-integrated AI assistant. "
             "Be concise, helpful, and slightly futuristic in tone. "
